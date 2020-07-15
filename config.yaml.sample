@@ -53,7 +53,7 @@ notifier:
         type: "direct"
         durable: true
         auto_delete: false
-    uri: "amqp://user:pass@host:10000/vhost"
+    uris: ["amqp://user:pass@host:10000/vhost"]
     routing_key: "notifications" 
     callback: "http://clair-notifier/api/v1/notifications"
 
