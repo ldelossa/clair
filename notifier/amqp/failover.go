@@ -25,7 +25,7 @@ func (f *FailOver) Connection(ctx context.Context) (*samqp.Connection, error) {
 		Logger()
 	ctx = log.WithContext(ctx)
 
-	err := f.Config.Validate()
+	_, err := f.Config.Validate()
 	if err != nil {
 		return nil, err
 	}

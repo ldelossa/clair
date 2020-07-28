@@ -160,10 +160,15 @@ func webhookDeliveries(ctx context.Context, opts Opts, lockPool *sqlx.DB, store 
 	ctx = log.WithContext(ctx)
 	log.Info().Int("count", deliveries).Msg("intializing webhook deliverers")
 
+	conf, err := opts.Webhook.Validate()
+	if err != nil {
+		return err
+	}
+
 	ds := make([]*notifier.Delivery, 0, deliveries)
 	for i := 0; i < deliveries; i++ {
 		distLock := pgdl.NewLock(lockPool, 0)
-		wh, err := webhook.New(*opts.Webhook, nil)
+		wh, err := webhook.New(conf, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create webhook deliverer: %v", err)
 		}
@@ -182,32 +187,32 @@ func amqpDeliveries(ctx context.Context, opts Opts, lockPool *sqlx.DB, store not
 		Logger()
 	ctx = log.WithContext(ctx)
 
-	err := opts.AMQP.Validate()
+	conf, err := opts.AMQP.Validate()
 	if err != nil {
 		return fmt.Errorf("amqp validation failed: %v", err)
 	}
 
-	if len(opts.AMQP.URIs) == 0 {
+	if len(conf.URIs) == 0 {
 		log.Warn().Msg("amqp delivery was configured with no broker URIs to connect to. delivery of notifications will not occur.")
 		return nil
 	}
 
 	fo := &namqp.FailOver{
-		Config: *opts.AMQP,
+		Config: conf,
 	}
 
 	ds := make([]*notifier.Delivery, 0, deliveries)
 	for i := 0; i < deliveries; i++ {
 		distLock := pgdl.NewLock(lockPool, 0)
-		if opts.AMQP.Direct {
-			q, err := namqp.NewDirectDeliverer(*(opts.AMQP), fo)
+		if conf.Direct {
+			q, err := namqp.NewDirectDeliverer(conf, fo)
 			if err != nil {
 				return fmt.Errorf("failed to create AMQP deliverer: %v", err)
 			}
 			delivery := notifier.NewDelivery(i, q, opts.DeliveryInterval, store, distLock)
 			ds = append(ds, delivery)
 		} else {
-			q, err := namqp.New(*(opts.AMQP), fo)
+			q, err := namqp.New(conf, fo)
 			if err != nil {
 				return fmt.Errorf("failed to create AMQP deliverer: %v", err)
 			}

@@ -73,23 +73,24 @@ type Config struct {
 
 // Validate confirms configuration is valid and fills in private members
 // with parsed values on success.
-func (c *Config) Validate() error {
+func (c *Config) Validate() (Config, error) {
+	conf := *c
 	if c.Exchange.Type == "" {
-		return fmt.Errorf("AMQP config requires the exchange.type field")
+		return conf, fmt.Errorf("AMQP config requires the exchange.type field")
 	}
 	if c.RoutingKey == "" {
-		return fmt.Errorf("AMQP config requires the routing key field")
+		return conf, fmt.Errorf("AMQP config requires the routing key field")
 	}
 	for _, uri := range c.URIs {
-		if strings.HasPrefix(uri, "ampq://") {
+		if strings.HasPrefix(uri, "amqps://") {
 			if c.TLSRootCA == "" {
-				return fmt.Errorf("amqps:// broker requires tls_root_ca")
+				return conf, fmt.Errorf("amqps:// broker requires tls_root_ca")
 			}
 			if c.TLSCert == "" {
-				return fmt.Errorf("amqps:// broker requires tls_cert")
+				return conf, fmt.Errorf("amqps:// broker requires tls_cert")
 			}
 			if c.TLSKey == "" {
-				return fmt.Errorf("amqps:// broker requires tls_key")
+				return conf, fmt.Errorf("amqps:// broker requires tls_key")
 			}
 		}
 	}
@@ -99,27 +100,23 @@ func (c *Config) Validate() error {
 		var err error
 		ca := []byte{}
 		if ca, err = ioutil.ReadFile(c.TLSRootCA); err != nil {
-			return fmt.Errorf("failed to read tls root ca: %v", err)
+			return conf, fmt.Errorf("failed to read tls root ca: %v", err)
 		}
 		TLS.RootCAs.AppendCertsFromPEM(ca)
 		var cert tls.Certificate
 		if cert, err = tls.LoadX509KeyPair(c.TLSCert, c.TLSKey); err != nil {
-			return fmt.Errorf("failed to read x509 cert and key pair: %v", err)
+			return conf, fmt.Errorf("failed to read x509 cert and key pair: %v", err)
 		}
 		TLS.Certificates = append(TLS.Certificates, cert)
-		c.Lock()
-		c.tls = TLS
-		c.Unlock()
+		conf.tls = TLS
 	}
 
-	c.Lock()
 	if !c.Direct {
 		callback, err := url.Parse(c.Callback)
 		if err != nil {
-			return fmt.Errorf("failed to parse callback url")
+			return conf, fmt.Errorf("failed to parse callback url")
 		}
-		c.callback = *callback
+		conf.callback = *callback
 	}
-	c.Unlock()
-	return nil
+	return conf, nil
 }

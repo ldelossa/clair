@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sync"
 )
 
 // Config provides configuration for an Webhook deliverer.
 type Config struct {
-	sync.Mutex
 	// the URL where our webhook will be delivered
 	Target string `yaml:"target"`
 	target *url.URL
@@ -21,21 +19,20 @@ type Config struct {
 	Headers http.Header `yaml:"headers"`
 }
 
-// Validate confirms configuration is valid and fills in private members
-// with parsed values on success.
-func (c *Config) Validate() error {
+// Validate will return a copy of the Config on success.
+// If any validation fails an error will be returned.
+func (c *Config) Validate() (Config, error) {
+	conf := *c
 	target, err := url.Parse(c.Target)
 	if err != nil {
-		return fmt.Errorf("failed to parse target url")
+		return conf, fmt.Errorf("failed to parse target url")
 	}
-	c.target = target
+	conf.target = target
 
-	c.Lock()
 	callback, err := url.Parse(c.Callback)
 	if err != nil {
-		return fmt.Errorf("failed to parse callback url")
+		return conf, fmt.Errorf("failed to parse callback url")
 	}
-	c.callback = callback
-	c.Unlock()
-	return nil
+	conf.callback = callback
+	return conf, nil
 }

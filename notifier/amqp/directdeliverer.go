@@ -24,12 +24,14 @@ type DirectDeliverer struct {
 }
 
 func NewDirectDeliverer(conf Config, fo *FailOver) (*DirectDeliverer, error) {
-	if err := conf.Validate(); err != nil {
+	var c Config
+	var err error
+	if c, err = conf.Validate(); err != nil {
 		return nil, err
 	}
 
 	return &DirectDeliverer{
-		conf: conf,
+		conf: c,
 		n:    []notifier.Notification{},
 		fo:   fo,
 	}, nil

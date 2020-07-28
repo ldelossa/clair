@@ -51,7 +51,8 @@ func TestDeliverer(t *testing.T) {
 		Callback: callback,
 		Target:   server.URL,
 	}
-	err := conf.Validate()
+	var err error
+	conf, err = conf.Validate()
 	if err != nil {
 		t.Fatalf("failed to validate webhook config: %v", err)
 	}

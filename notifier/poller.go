@@ -49,7 +49,7 @@ type Event struct {
 // Poll is a non blocking call which begins
 // polling the Matcher for UpdateOperations.
 //
-// Returned channel can be listened too for events.
+// Returned channel can be listened to for events.
 //
 // Cancel ctx to stop the poller.
 func (p *Poller) Poll(ctx context.Context) <-chan Event {

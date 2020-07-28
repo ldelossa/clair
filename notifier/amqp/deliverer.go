@@ -24,11 +24,13 @@ type Deliverer struct {
 }
 
 func New(conf Config, fo *FailOver) (*Deliverer, error) {
-	if err := conf.Validate(); err != nil {
+	var c Config
+	var err error
+	if c, err = conf.Validate(); err != nil {
 		return nil, err
 	}
 	return &Deliverer{
-		conf: conf,
+		conf: c,
 		fo:   fo,
 	}, nil
 }

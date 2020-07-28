@@ -17,21 +17,22 @@ import (
 type Deliverer struct {
 	conf Config
 	// a client to use for POSTing webhooks
-	c   *http.Client
-	log *zerolog.Logger
+	c *http.Client
 }
 
 // New returns a new webhook Deliverer
-func New(conf Config, c *http.Client) (*Deliverer, error) {
-	if err := conf.Validate(); err != nil {
+func New(conf Config, client *http.Client) (*Deliverer, error) {
+	var c Config
+	var err error
+	if c, err = conf.Validate(); err != nil {
 		return nil, err
 	}
-	if c == nil {
-		c = http.DefaultClient
+	if client == nil {
+		client = http.DefaultClient
 	}
 	return &Deliverer{
-		conf: conf,
-		c:    c,
+		conf: c,
+		c:    client,
 	}, nil
 }
 
