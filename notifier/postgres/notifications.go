@@ -8,18 +8,19 @@ import (
 	clairerror "github.com/quay/clair/v4/clair-error"
 	"github.com/quay/clair/v4/notifier"
 	"github.com/quay/clair/v4/pkg/pager"
+	"github.com/rs/zerolog"
 )
 
-// notifications returns a slice of notifications associated with the provided
-// notification id
-//
-// this functions treats in page.Next argument as the page to fetch and return.
 func notifications(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID, page *pager.Page) ([]notifier.Notification, pager.Page, error) {
 	const (
 		query      = "SELECT id, body FROM notification_body WHERE notification_id = $1"
-		pagedQuery = "SELECT id, body FROM notification_body WHERE notification_id = $1 OFFSET $2 LIMIT $3"
-		count      = "SELECT COUNT(*) FROM notification_body WHERE notification_id = $1"
+		pagedQuery = "SELECT id, body FROM notification_body WHERE notification_id = $1 AND id > $2 ORDER BY id ASC LIMIT $3"
 	)
+	log := zerolog.Ctx(ctx).With().
+		Str("component", "notifier/postgres/notifications/notifications").
+		Logger()
+	ctx = log.WithContext(ctx)
+
 	// if no page argument early return all notifications
 	if page == nil {
 		p := pager.Page{}
@@ -37,18 +38,25 @@ func notifications(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID, page *
 		return notifications, p, nil
 	}
 
-	// get total number of notifications for this notification id
-	var total uint64
-	row := pool.QueryRow(ctx, count, id)
-	err := row.Scan(&total)
-	if err != nil {
-		return nil, pager.Page{}, clairerror.ErrBadNotification{id, err}
+	// page to return to client
+	outPage := pager.Page{
+		Size: page.Size,
 	}
-	p, offset, limit := pager.SQLPager(*page, total)
 
-	// do query with offset and limit
+	// page.Next being nil indicates a client's first
+	// request for a paged set of notifications.
+	if page.Next == nil {
+		page.Next = &uuid.Nil
+	}
+
+	// add one to limit to determine if there is
+	// another page to fetch
+	limit := page.Size + 1
+
+	log.Debug().Str("IncomingID", page.Next.String()).Msg("Incoming ID")
+
 	notifications := make([]notifier.Notification, 0, limit)
-	rows, _ := pool.Query(ctx, pagedQuery, id, offset, limit)
+	rows, _ := pool.Query(ctx, pagedQuery, id, page.Next, limit)
 	defer rows.Close()
 	for rows.Next() {
 		var n notifier.Notification
@@ -58,6 +66,21 @@ func notifications(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID, page *
 		}
 		notifications = append(notifications, n)
 	}
+	log.Debug().Int("len", len(notifications)).Msg("retrieved length")
 
-	return notifications, p, nil
+	morePages := uint64(len(notifications)) == limit
+	if morePages {
+		// Slice off the last element as it was only an indicator
+		// that another page should be delivered.
+		//
+		// Set outPage.Next to the final element id being returned
+		// to the caller.
+		notifications = notifications[:page.Size]
+		outPage.Next = &(notifications[page.Size-1].ID)
+	} else {
+		outPage.Next = nil
+	}
+
+	log.Debug().Int("len", len(notifications)).Msg("Returning length")
+	return notifications, outPage, nil
 }

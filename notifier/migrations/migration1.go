@@ -22,6 +22,7 @@ const (
 		notification_id uuid REFERENCES notification,
 		body jsonb NOT NULL -- serialized json body of notification
 	);
+	CREATE INDEX notification_body_idx ON notification_body (notification_id, id);
 
 	--- an enumeration identifying the possible status a receipt may be in
 	CREATE TYPE receiptstatus AS ENUM ('created', 'delivered', 'delivery_failed', 'deleted');
@@ -35,5 +36,6 @@ const (
 		ts timestamptz,
 		details jsonb -- any additional details specific to the delivery mechanism
 	);
+	CREATE INDEX receipt_idx ON receipt (notification_id, uo_id);
 	`
 )
